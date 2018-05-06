@@ -1,6 +1,7 @@
+#Baseline classifier with Bag of Words implementation
+
 import csv
 import numpy
-import scipy
 import collections
 import re
 import sys
@@ -12,35 +13,40 @@ from sklearn import metrics, datasets, svm, cross_validation
 from collections import Counter, OrderedDict
 
 annotations = ["Business", "Entertainment", "Error", "Health", "Other", "Politics", "Science and Technology", "Society", "Sports", "War"]
+#Sets whether the body is included in analysis, or if it is just the title
 includeBody = True
+#Sets the number of folds for validation
 folds = 2
 printMetrics = True
 printPredictions = False
 
+#Filters the CSV file into an array of words for each article
+def createCorpus(reader, includeBody):
+    corpus = []
+    categories = []
+    titles = []
+    for row in reader:
+        text = ""
+        if includeBody == True:
+            text = row[2] + " " + row[3]
+        else:
+            text = row[2]
+        titles.append(row[2])
+        categories.append(row[0])
+        corpus.append(text)
+    targets = numpy.array(categories)
+    return corpus, targets, titles
+
 class BagOfWords:
-
-    def createCorpus(reader, includeBody):
-        corpus = []
-        categories = []
-        titles = []
-        for row in reader:
-            text = ""
-            if includeBody == True:
-                text = row[2] + " " + row[3]
-            else:
-                text = row[2]
-            titles.append(row[2])
-            categories.append(row[0])
-            corpus.append(text)
-        targets = numpy.array(categories)
-        return corpus, targets, titles
-
+    #Using Logistic Regression, predicts categories for each article
     def generatePredictions(corpus, targets):
         vectorizer = CountVectorizer()
         X = vectorizer.fit_transform(corpus)
         X = X.toarray()
         LogReg = LogisticRegression()
-        #LogReg.fit(X, targets)
+        '''
+        CROSS VALIDATION: cv assigned folds global variable for number of requested folds
+        '''
         predicted = cross_validation.cross_val_predict(LogReg, X, targets, cv=folds)
         return predicted
 
