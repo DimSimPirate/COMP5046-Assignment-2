@@ -1,10 +1,17 @@
 #This experiment will clean up some of the textual data and apply TF-IDF weighting
-import Experiment0
+
+import Helper
+import numpy
+import sys
+import re
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.cross_validation import KFold
+from sklearn import cross_validation
+
+from sklearn.feature_extraction.text import TfidfVectorizer
 
         #TODO: normalise numbers
-        #TODO: stem Words
-        #TODO: lematise Words
-        #TODO: apply TD-IDF weighting
 
 # Dictionary modified from https://stackoverflow.com/questions/19790188/expanding-english-language-contractions-in-python
 contractions = {
@@ -122,49 +129,48 @@ contractions = {
   "y'all've": "you all have",
   "you'd": "you had",
   "you'd've": "you would have",
-  "you'll": "you you will",
-  "you'll've": "you you will have",
+  "you'll": "you will",
+  "you'll've": "you will have",
   "you're": "you are",
   "you've": "you have"
 }
 #NOTE: this does not take into consideration ambiguous contractions
 
-compiledContractions = re.compile('(%s)' % '|'.join(contractions.keys()))
+resultFileName = "test1.txt"
+#Removes words that only appear once in the entire corpus
+minCutoff = 1;
+#Float to exclude the most occuring words
+maxCutoff = 0.9
 
+#Function to expand contractions in the corpus
+compiledContractions = re.compile('(%s)' % '|'.join(contractions.keys()))
 def expandCont(paragraph):
     def replace(match):
         return contractions[match.group(0)]
-    return compiledContractions.sub(replace, text.lower())
+    return compiledContractions.sub(replace, paragraph.lower())
+
+def generatePredictions(corpus, targets):
+    vectorizer = TfidfVectorizer(stop_words='english', lowercase=True, min_df=minCutoff, max_df=maxCutoff, norm='l2')
+    X = vectorizer.fit_transform(corpus)
+    X = X.toarray()
+    LogReg = LogisticRegression()
+    '''
+    CROSS VALIDATION: cv assigned folds global variable for number of requested folds
+    '''
+    kFold = KFold(len(targets), shuffle=True, n_folds=Helper.folds)
+    scores = cross_val_score(LogReg, X, targets, cv=kFold)
+    print("SCORES FOR EACH OF THE FOLDS")
+    print(scores)
+    predicted = cross_validation.cross_val_predict(LogReg, X, targets, cv=kFold)
+    return predicted
 
 class normAndWeights:
-
-    def predictions(corpus, targets):
-        vectorizer = CountVectorizer(stop_words='english')
-        X = vectorizer.fit_transform(corpus)
-        X = X.toarray()
-        LogReg = LogisticRegression()
-        '''
-        CROSS VALIDATION: cv assigned folds global variable for number of requested folds
-        '''
-        predicted = cross_validation.cross_val_predict(LogReg, X, targets, cv=folds)
-        return predicted
-
     filePath = sys.argv[1]
-    selectedFile = "";
-    if filePath == "topic.csv":
-        selectedFile = "topic"
-    elif filePath == "virality.csv":
-        selectedFile = "virality"
-    else:
-        selectedFile = "other"
+    corpus, targets, titles = Helper.createCorpus(filePath)
 
-    with open(filePath, "r+") as csvfile:
-        reader = csv.reader(csvfile)
-        next(reader)
-        corpus, targets, titles = createCorpus(reader)
+    for i in range(0, len(corpus)):
+        replacement = expandCont(corpus[i])
+        corpus[i] = replacement
 
-        for i in range(0, len(corpus)):
-            replacement = expandCont(corpus[i])
-            corpus[i] = replacement
-
-        predictions(corpus, targets)
+    predicted = generatePredictions(corpus, targets)
+    Helper.printResults(targets, predicted, titles, resultFileName)
